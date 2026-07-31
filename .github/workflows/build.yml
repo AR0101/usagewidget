@@ -12,6 +12,11 @@ jobs:
   windows:
     runs-on: windows-latest
 
+    # Needed only by the release step, but the default token is read-only in
+    # repositories configured that way, and the failure surfaces late.
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
