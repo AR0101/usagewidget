@@ -26,11 +26,15 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 # SIMD substring search. Every usage line is found by scanning for `"usage"`
 # before any JSON is parsed, so this is the hot loop of the whole scan.
 memchr = "2"
+# One GET every 50 seconds at most. A blocking client on a worker thread is the
+# right shape here; an async runtime would be more machinery than the job needs.
+ureq = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_System_Threading",
+    "Win32_Security_Credentials",
 ] }
 
 [target.'cfg(unix)'.dependencies]

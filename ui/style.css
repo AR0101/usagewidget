@@ -195,6 +195,16 @@ body {
   flex: 1;
 }
 
+/* Present only while the percentages came from the account rather than a cache. */
+.phead .livedot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.9;
+  flex: none;
+}
+
 .phead .plan {
   font-size: 9.5px;
   font-weight: 600;

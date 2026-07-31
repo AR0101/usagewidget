@@ -26,6 +26,9 @@ pub struct Prefs {
     pub opacity: f64,
     pub always_on_top: bool,
     pub refresh_interval: f64,
+    /// Ask the account for the current limit percentages instead of reading the
+    /// number Claude Code last cached.
+    pub live_limits: bool,
     pub pos_vertical: Option<(f64, f64)>,
     pub pos_horizontal: Option<(f64, f64)>,
 }
@@ -43,6 +46,7 @@ impl Default for Prefs {
             opacity: 1.0,
             always_on_top: true,
             refresh_interval: 60.0,
+            live_limits: true,
             pos_vertical: None,
             pos_horizontal: None,
         }

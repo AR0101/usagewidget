@@ -82,6 +82,12 @@ fn build(app: &AppHandle, p: &Prefs) -> tauri::Result<tauri::menu::Menu<tauri::W
         .item(&detail)
         .item(&zoom)
         .item(&rows)
+        .item(&check(
+            app,
+            "liveLimits",
+            "계정에서 실시간 한도 가져오기",
+            p.live_limits,
+        )?)
         .item(&check(app, "alwaysOnTop", "항상 위에 표시", p.always_on_top)?)
         .item(&opacity)
         .item(&rate)
@@ -136,15 +142,29 @@ pub fn register_handler(app: &AppHandle) {
                 let on = auto.is_enabled().unwrap_or(false);
                 let _ = if on { auto.disable() } else { auto.enable() };
             }
-            "alwaysOnTop" => {
+            "alwaysOnTop" | "liveLimits" => {
                 let state = handle.state::<crate::AppState>();
-                let now = !state.prefs.lock().map(|p| p.always_on_top).unwrap_or(true);
+                let now = !state
+                    .prefs
+                    .lock()
+                    .map(|p| {
+                        if group == "liveLimits" {
+                            p.live_limits
+                        } else {
+                            p.always_on_top
+                        }
+                    })
+                    .unwrap_or(true);
                 crate::set_pref(
                     handle.clone(),
                     state,
-                    "alwaysOnTop".into(),
+                    group.to_string(),
                     serde_json::Value::Bool(now),
                 );
+                if group == "liveLimits" {
+                    let h = handle.clone();
+                    std::thread::spawn(move || crate::full_scan(&h));
+                }
             }
             "resetSize" => {
                 let state = handle.state::<crate::AppState>();

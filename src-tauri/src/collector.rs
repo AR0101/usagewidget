@@ -49,6 +49,10 @@ pub struct Collector {
     tails: HashMap<String, TailState>,
     /// Cached liveness, so a pulse does not shell into WSL every two seconds.
     live_cache: Option<(Instant, HashSet<u32>)>,
+    live: crate::live::LiveUsage,
+    /// User preference; `--dump` turns it off so the dev path never prompts for
+    /// a credential it does not need.
+    pub use_live_limits: bool,
 }
 
 impl Collector {
@@ -57,6 +61,8 @@ impl Collector {
             roots: paths::detect(),
             tails: HashMap::new(),
             live_cache: None,
+            live: crate::live::LiveUsage::default(),
+            use_live_limits: true,
         }
     }
 
@@ -219,7 +225,7 @@ impl Collector {
     /// Claude Code caches the plan-utilisation response it gets from the API.
     /// We can only read that cache — if the CLI has not run in a while it goes
     /// stale, which is why `limits_fetched_at` is surfaced in the UI.
-    fn read_claude_limits(&self, p: &mut ProviderStats) {
+    fn read_claude_limits(&mut self, p: &mut ProviderStats) {
         let Ok(data) = std::fs::read(self.roots.claude_json()) else {
             return;
         };
@@ -233,15 +239,28 @@ impl Collector {
             p.plan = tier.and_then(pretty_claude_plan);
         }
 
-        let Some(cache) = root.get("cachedUsageUtilization") else {
-            return;
-        };
-        if let Some(ms) = cache.get("fetchedAtMs").and_then(Value::as_f64) {
-            p.limits_fetched_at = Some(ms / 1000.0);
+        // Ask the account first. It answers with the current numbers rather than
+        // whatever the CLI last happened to write down.
+        let mut utilization: Option<Value> = None;
+        if self.use_live_limits {
+            if let Some(live) = self.live.fetch(&self.roots) {
+                utilization = Some(live.utilization.clone());
+                p.limits_fetched_at = Some(live.fetched_at);
+                p.limits_are_live = true;
+            }
+            p.live_error = self.live.last_error();
         }
-        let Some(u) = cache.get("utilization") else {
-            return;
-        };
+
+        if utilization.is_none() {
+            let Some(cache) = root.get("cachedUsageUtilization") else {
+                return;
+            };
+            if let Some(ms) = cache.get("fetchedAtMs").and_then(Value::as_f64) {
+                p.limits_fetched_at = Some(ms / 1000.0);
+            }
+            utilization = cache.get("utilization").cloned();
+        }
+        let Some(u) = utilization else { return };
 
         for (key, label) in [("five_hour", "5시간 세션"), ("seven_day", "주간")] {
             let Some(w) = u.get(key) else { continue };

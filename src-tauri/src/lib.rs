@@ -6,6 +6,7 @@
 //! seconds regardless of what the UI is doing.
 
 mod collector;
+mod live;
 mod menu;
 mod model;
 mod paths;
@@ -119,6 +120,12 @@ fn set_pref(
                 p.always_on_top = value.as_bool().unwrap_or(true);
                 if let Some(w) = app.get_webview_window("panel") {
                     let _ = w.set_always_on_top(p.always_on_top);
+                }
+            }
+            "liveLimits" => {
+                p.live_limits = value.as_bool().unwrap_or(true);
+                if let Ok(mut c) = state.collector.lock() {
+                    c.use_live_limits = p.live_limits;
                 }
             }
             "resetSize" => p.reset_size(),
@@ -303,8 +310,11 @@ pub fn run() {
             apply_backdrop(&window);
             place(&window, &prefs);
 
+            let mut collector = Collector::new();
+            collector.use_live_limits = prefs.live_limits;
+
             app.manage(AppState {
-                collector: Mutex::new(Collector::new()),
+                collector: Mutex::new(collector),
                 stats: Mutex::new(Stats::default()),
                 prefs: Mutex::new(prefs),
                 prefs_path,
@@ -341,6 +351,9 @@ fn apply_backdrop(window: &WebviewWindow) {
 
 fn dump() {
     let mut c = Collector::new();
+    // A layout or parity check has no use for live limits, and asking for them
+    // means prompting for a credential the check does not need.
+    c.use_live_limits = !std::env::args().any(|a| a == "--no-live");
     println!("roots: {:?}  ({:?})", c.roots.home, c.roots.origin);
     let s = c.collect();
     println!("collected in {:.2}s", s.scan_seconds);
@@ -349,6 +362,14 @@ fn dump() {
         println!("  plan:      {}", p.plan.clone().unwrap_or("-".into()));
         if let Some(u) = &p.unavailable {
             println!("  UNAVAILABLE: {u}");
+        }
+        if p.limits_are_live {
+            println!("  source:    계정 실시간");
+        } else if p.limits_fetched_at.is_some() {
+            println!("  source:    로컬 캐시");
+        }
+        if let Some(e) = &p.live_error {
+            println!("  live err:  {e}");
         }
         for l in &p.limits {
             println!("  {:<12} {:5.1}%", l.label, l.percent);

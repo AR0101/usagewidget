@@ -23,6 +23,7 @@ macOS용 SwiftUI 위젯을 Tauri로 옮긴 것이다. **파싱 로직과 화면�
 | 세부 항목 | 세션별 / 모델별 / 둘 다 / 표시 안 함 |
 | 확대 | 80 / 90 / 100 / 115 / 130 / 150 / 175 % |
 | 목록 행 수 | 3 / 5 / 7 / 10 / 14 행 |
+| 계정에서 실시간 한도 가져오기 | 켜면 저장된 토큰으로 직접 조회, 끄면 로컬 캐시 |
 | 항상 위에 표시 | 끄면 다른 창 뒤로 |
 | 투명도 | 100 / 90 / 75 / 60 / 45 % |
 | 새로고침 주기 | 30초 / 1분 / 5분 / 15분 |
@@ -36,11 +37,12 @@ macOS용 SwiftUI 위젯을 Tauri로 옮긴 것이다. **파싱 로직과 화면�
 
 ## 데이터 출처
 
-로컬 파일만 읽는다. 네트워크로 나가는 것은 없다.
+기본은 로컬 파일만 읽는다. `계정에서 실시간 한도 가져오기` 를 켰을 때만 저장된 토큰으로 Anthropic 엔드포인트를 호출한다(아래 참고).
 
 | 표시 항목 | 출처 | 신선도 |
 |---|---|---|
-| Claude 5시간 / 주간 **%** | `~/.claude.json` → `cachedUsageUtilization` | Claude Code가 갱신할 때만 |
+| Claude 5시간 / 주간 **%** (실시간) | 저장된 OAuth 토큰 → `GET /api/oauth/usage` | 요청 시점 (50초 재사용) |
+| Claude 5시간 / 주간 **%** (대체) | `~/.claude.json` → `cachedUsageUtilization` | Claude Code가 갱신할 때만 |
 | Claude 플랜 | `~/.claude.json` → `oauthAccount` | — |
 | Claude **토큰** (최근 5시간 / 오늘 / 이번 주, 모델별) | `~/.claude/projects/**/*.jsonl` | 항상 실시간 |
 | **세션별** 사용량 + 현재 컨텍스트 | `~/.claude/sessions/<pid>.json` × 위 트랜스크립트 | **2초** (증분 tail) |
@@ -52,7 +54,11 @@ macOS용 SwiftUI 위젯을 Tauri로 옮긴 것이다. **파싱 로직과 화면�
 - **세션마다 막대가 두 개다.** 위(프로바이더 색)는 최근 5시간 사용량, 아래(파랑)는 **현재 컨텍스트 점유율**(1M 기준). 둘은 서로 무관한 값이다 — 싸게 쓰면서 컨텍스트만 꽉 찬 세션도, 방금 컴팩트해서 비었는데 누적은 큰 세션도 있다. 그래서 같은 축을 공유하지 않고 색을 나눴다. 사용량 막대는 그 시점 1위 세션 대비 비율, 컨텍스트 막대는 절대 비율이다. 50% 미만 파랑, 75%까지 노랑, 그 이상 빨강 — 빨강이면 `/compact` 할 때다.
 - **세션 막대는 2초마다 움직인다** (`Collector::pulse`). 전체 스캔은 수백 MB를 훑느라 자주 못 돌린다. 그래서 전체 스캔은 `새로고침 주기` 대로 두고, 그 사이에는 실행 중인 세션의 트랜스크립트에서 **직전 pulse 이후 늘어난 바이트만** 읽어 증분 반영한다. 전체 스캔이 끝날 때마다 오프셋을 EOF로 되돌려서(`rebase_tails`) 같은 줄을 두 번 세지 않는다.
 - **큰 숫자의 대부분은 캐시 재사용이다.** 대화가 길어지면 매 턴 직전까지의 전체 맥락을 다시 읽는데, 그게 `cache_read` 로 집계된다. 그래서 합계 아래에 `실제 생성 X · 캐시 재사용 Y%` 를 같이 표시한다.
-- **Claude의 % 는 캐시다.** Claude Code가 그 값을 다시 받아올 때만 바뀐다. 2시간 이상 묵으면 푸터에 `한도 N시간 전 기준` 이 뜬다. Claude Code에서 `/usage` 를 실행하면 갱신된다. (macOS판에 있는 키체인 실시간 조회는 Windows에 대응 저장소가 달라 아직 없다.)
+- **실시간 한도 (`live.rs`).** Claude Code가 로그인 때 저장해둔 OAuth 액세스 토큰을 읽어 `GET https://api.anthropic.com/api/oauth/usage` 를 호출한다 (`Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20`). CLI가 쓰는 것과 같은 경로다. 성공 값은 50초간 재사용하고, 실패하면 조용히 로컬 캐시로 돌아가면서 푸터에 사유를 표시한다. 실시간으로 받아온 동안에는 프로바이더 이름 옆에 작은 점이 하나 켜진다.
+  - **토큰을 어디서 찾는가는 플랫폼마다 다르다.** macOS는 키체인이 있지만 Windows·Linux에는 없다. 그래서 후보를 순서대로 시도한다: ① `<home>/.claude/.credentials.json` (키체인이 없는 환경에서 Claude Code가 쓰는 위치, WSL 포함) → ② Windows 자격 증명 관리자 (`Claude Code-credentials`) → ③ macOS 키체인. 어느 것도 없으면 캐시로 폴백한다.
+  - 토큰은 이 모듈 밖으로 나가지 않는다. 로그에도 디스크에도 남기지 않고, `Authorization` 헤더에만 쓴다.
+  - 문서화된 API가 아니다. 경로가 바뀌면 캐시 방식으로 자동 폴백한다.
+- **캐시로 폴백했을 때의 % 는 묵을 수 있다.** Claude Code가 그 값을 다시 받아올 때만 바뀐다. 2시간 이상 묵으면 푸터에 `한도 N시간 전 기준` 이 뜬다. Claude Code에서 `/usage` 를 실행하면 갱신된다.
 - 토큰 집계는 `input + output + cache_creation + cache_read` 합계다. 같은 API 호출이 여러 파일에 중복 기록될 수 있어 `requestId` 로 중복을 제거한다.
 - **실행 중인 세션만 나열한다.** `~/.claude/sessions/<pid>.json` 은 프로세스가 죽어도 남아서, pid 생존을 확인한 뒤에만 신뢰한다. 이미 끝난 세션의 사용량은 목록에 넣지 않고 따로 합산한다.
 
@@ -74,6 +80,7 @@ pid 생존 확인이 여기서 갈린다. WSL 세션의 pid는 리눅스 네임�
 ```
 cargo tauri dev                       # 실행
 cargo run --release -- --dump         # 수집 결과를 텍스트로 출력
+cargo run --release -- --dump --no-live    # 실시간 조회 없이 (자격증명 안 건드림)
 cargo run --release -- --dump --pulse 20   # 20초 기다렸다 증분 tail 결과 출력
 cargo test                            # 타임스탬프 파서, 모델명 정리, tail 경계
 ```
@@ -86,6 +93,7 @@ cargo test                            # 타임스탬프 파서, 모델명 정리
 |---|---|
 | `src-tauri/src/collector.rs` | JSONL 스트리밍 파싱, 일별 버킷 집계, 2초 증분 tail |
 | `src-tauri/src/paths.rs` | Windows/WSL 홈 탐지, pid 생존 확인 |
+| `src-tauri/src/live.rs` | 저장된 토큰으로 계정 한도 실시간 조회 |
 | `src-tauri/src/model.rs` | 데이터 모델 |
 | `src-tauri/src/prefs.rs` | 설정 저장 (`%APPDATA%\com.local.usagewidget\prefs.json`) |
 | `src-tauri/src/menu.rs` | 우클릭 메뉴 |

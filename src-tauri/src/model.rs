@@ -86,6 +86,10 @@ pub struct ProviderStats {
     pub limits: Vec<LimitWindow>,
     /// When the provider last refreshed the limit numbers.
     pub limits_fetched_at: Option<f64>,
+    /// True when the numbers came from the account just now rather than a cache.
+    pub limits_are_live: bool,
+    /// Why the live fetch fell back, if it did.
+    pub live_error: Option<String>,
     pub today: TokenBreakdown,
     pub week: TokenBreakdown,
     /// Rolling 5-hour window, computed from the logs. Unlike the percentages

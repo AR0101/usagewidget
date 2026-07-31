@@ -107,6 +107,8 @@ function titleBar() {
  *  panel says how old they are rather than pretending they are live. */
 function staleNote() {
   const c = stats.claude;
+  if (c.liveError) return `한도 캐시 · ${c.liveError}`;
+  if (c.limitsAreLive) return null;
   if (!c.limitsFetchedAt) return null;
   if (now - c.limitsFetchedAt <= 2 * 3600) return null;
   return `한도 ${ago(c.limitsFetchedAt)} 기준`;
@@ -233,6 +235,11 @@ function providerSection(title, accent, p, opts) {
 
   const head = el('div', 'phead');
   add(head, el('i', 'dot'), el('span', 'name', title), el('span', 'spacer'));
+  if (p.limitsAreLive) {
+    const live = el('i', 'livedot');
+    live.title = '계정에서 실시간 조회';
+    add(head, live);
+  }
   if (p.plan) add(head, el('span', 'plan', p.plan.toUpperCase()));
   add(sec, head);
 
