@@ -1,0 +1,49 @@
+[package]
+name = "usagewidget"
+version = "1.0.0"
+description = "Claude Code + Codex 사용량 데스크탑 위젯"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "usagewidget_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api is what allows a transparent window on macOS, which is how
+# the panel is checked during development. Windows needs nothing extra.
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+window-vibrancy = "0.6"
+# Local midnights, for the daily buckets. Rolling our own would mean carrying a
+# timezone database, and "today" has to be the user's today, not UTC's.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# SIMD substring search. Every usage line is found by scanning for `"usage"`
+# before any JSON is parsed, so this is the hot loop of the whole scan.
+memchr = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# A widget that walks a few hundred megabytes of transcripts wants the optimiser
+# on even in dev; a debug-mode scan is slow enough to feel broken.
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

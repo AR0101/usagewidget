@@ -1,0 +1,515 @@
+/* Colours and dimensions ported 1:1 from the macOS widget's Theme.swift and
+   PanelView.swift. Swift wrote them as 0–1 floats; these are the same values in
+   8-bit, so the two builds are the same panel rather than two similar ones. */
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('./fonts/PretendardVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: block;
+}
+
+:root {
+  /* Set by the panel element; every size below is written unscaled and the
+     zoom on #panel multiplies them, the way Metrics(scale:) did in Swift. */
+  color-scheme: dark;
+
+  --surface: rgba(22, 24, 29, 0.82);
+  --ink: rgb(246, 245, 243);
+  --dim: rgba(246, 245, 243, 0.66);
+  --dim2: rgba(246, 245, 243, 0.46);
+  --hair: rgba(255, 255, 255, 0.12);
+  --track: rgba(255, 255, 255, 0.16);
+  --track-faint: rgba(255, 255, 255, 0.11);
+  --border: rgba(255, 255, 255, 0.14);
+  --claude: rgb(236, 133, 96);
+  --codex: rgb(47, 206, 163);
+  --context: rgb(126, 164, 252);
+  --warn: rgb(246, 186, 71);
+  --critical: rgb(242, 109, 96);
+  --shadow: rgba(0, 0, 0, 0.45);
+  --meter-fade: 0.72;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --surface: rgba(254, 253, 252, 0.86);
+  --ink: rgb(27, 29, 33);
+  --dim: rgba(27, 29, 33, 0.62);
+  --dim2: rgba(27, 29, 33, 0.45);
+  --hair: rgba(0, 0, 0, 0.10);
+  --track: rgba(0, 0, 0, 0.10);
+  --track-faint: rgba(0, 0, 0, 0.07);
+  --border: rgba(0, 0, 0, 0.12);
+  --claude: rgb(196, 90, 53);
+  --codex: rgb(10, 130, 101);
+  --context: rgb(40, 95, 206);
+  --warn: rgb(180, 115, 11);
+  --critical: rgb(201, 55, 46);
+  --shadow: rgba(0, 0, 0, 0.22);
+  --meter-fade: 0.85;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  /* The panel is a desktop ornament: selecting its text or dragging an image
+     out of it is never what the user meant. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+body {
+  font-family: 'Pretendard', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  /* Room for the panel's own drop shadow inside the transparent window. */
+  padding: 14px;
+}
+
+#panel {
+  position: relative;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 8px 20px var(--shadow);
+  color: var(--ink);
+  overflow: hidden;
+  /* zoom, not transform: it scales layout as well as paint, so text is laid
+     out at its true size instead of being a magnified bitmap. */
+  zoom: var(--scale, 1);
+  width: var(--w, 268px);
+}
+
+#panel.horizontal {
+  width: var(--w, 460px);
+}
+
+/* MARK: - chrome */
+
+.titlebar {
+  padding: 9px 16px 2px;
+}
+
+.grabber {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  padding-bottom: 3px;
+}
+
+.grabber i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--dim2);
+  opacity: 0.5;
+}
+
+.titlerow {
+  display: flex;
+  justify-content: space-between;
+  color: var(--dim2);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.titlerow .brand {
+  letter-spacing: 1.6px;
+}
+
+.titlerow .clock {
+  letter-spacing: 0.4px;
+}
+
+.footbar {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 10px;
+  color: var(--dim2);
+  padding: 9px 16px 11px;
+}
+
+.footbar .spacer {
+  flex: 1;
+}
+
+.hair {
+  height: 0.5px;
+  background: var(--hair);
+  border: 0;
+}
+
+/* MARK: - provider block */
+
+.columns {
+  display: flex;
+  align-items: stretch;
+}
+
+.columns .vrule {
+  width: 0.5px;
+  background: var(--hair);
+}
+
+.provider {
+  padding: 13px 16px 15px;
+  flex: 1;
+  min-width: 0;
+}
+
+.compact .provider {
+  padding: 14px 16px 13px;
+}
+
+.phead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 11px;
+}
+
+.phead .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+
+.phead .name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.phead .spacer {
+  flex: 1;
+}
+
+.phead .plan {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  background: var(--track-faint);
+  border-radius: 5px;
+  padding: 2.5px 6px;
+}
+
+.muted {
+  font-size: 11px;
+  color: var(--dim2);
+}
+
+/* MARK: - limit meter */
+
+.meter {
+  padding-bottom: 10px;
+}
+
+.compact .meter {
+  padding-bottom: 8px;
+}
+
+.meter .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 5px;
+}
+
+.meter .label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dim);
+}
+
+.meter .pct {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tint);
+}
+
+.meter .pct.expired {
+  color: var(--dim2);
+}
+
+.meter .track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.meter .fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--tint) calc(var(--meter-fade) * 100%), transparent),
+    var(--tint)
+  );
+  transition: width 0.35s ease-out;
+}
+
+.meter .reset {
+  font-size: 10px;
+  color: var(--dim2);
+  padding-top: 5px;
+}
+
+/* MARK: - token rows */
+
+.trow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.trow .k {
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+.trow .v {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.inline {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding-top: 1px;
+}
+
+.inline .k {
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+.inline .v {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.inline .sep {
+  color: var(--dim2);
+}
+
+/* Most of a long conversation's token count is the same context being re-read.
+   Showing only the total makes ordinary use look enormous, so the split sits
+   right under the numbers. */
+.cachenote {
+  padding-top: 6px;
+}
+
+.cachenote .bar {
+  display: flex;
+  gap: 1px;
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.cachenote .fresh {
+  background: var(--accent);
+  transition: width 0.35s ease-out;
+}
+
+.cachenote .cached {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  flex: 1;
+}
+
+.cachenote .text {
+  font-size: 9.5px;
+  color: var(--dim2);
+}
+
+/* MARK: - breakdown groups */
+
+.breakdown {
+  padding-top: 9px;
+  margin-top: 9px;
+  border-top: 0.5px solid var(--hair);
+}
+
+.bhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dim2);
+  padding-bottom: 5px;
+}
+
+.bhead .title {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+}
+
+.bhead .spacer {
+  flex: 1;
+}
+
+.bhead .legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8.5px;
+}
+
+.bhead .swatch {
+  width: 7px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--c);
+}
+
+/* One live session: how much it has spent this window, and how full its context
+   is right now. The two are unrelated quantities — a session can be cheap and
+   nearly full, or expensive and freshly compacted — so each gets its own bar
+   and its own colour rather than sharing a scale. */
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.srow.idle {
+  opacity: 0.65;
+}
+
+/* No text-overflow here: these are truncated in the middle by script, because
+   the tail of a session name is what tells two of them apart
+   ("ralph-lauren-12" vs "ralph-lauren-demo112-c6"). */
+.srow .label {
+  font-size: 10.5px;
+  color: var(--dim);
+  min-width: 56px;
+  max-width: 168px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.srow .bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 36px;
+}
+
+.srow .nums {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 9.5px;
+  width: 42px;
+  flex: none;
+}
+
+.srow .nums .usage {
+  color: var(--dim);
+}
+
+.srow .nums .usage.zero {
+  color: var(--dim2);
+}
+
+.srow .nums .ctx {
+  color: var(--ctint);
+}
+
+/* A single hairline bar. Zero draws as an empty track, not a stub, so an idle
+   session is visibly different from one that has barely started. */
+.minibar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--track-faint);
+  overflow: hidden;
+}
+
+.minibar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--bar);
+  opacity: 0.85;
+  transition: width 0.35s ease-out;
+}
+
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2.5px 0;
+}
+
+.mrow .label {
+  font-size: 10.5px;
+  color: var(--dim);
+  min-width: 56px;
+  max-width: 168px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mrow .minibar {
+  flex: 1 1 auto;
+  min-width: 36px;
+}
+
+.mrow .v {
+  font-size: 10.5px;
+  color: var(--dim);
+  width: 44px;
+  text-align: right;
+  flex: none;
+}
+
+.more {
+  font-size: 9.5px;
+  color: var(--dim2);
+  padding-top: 2px;
+}
+
+/* MARK: - resize grip */
+
+/* An AppKit view in the macOS build, for the same reason it is a bare div here:
+   it has to win the mousedown before the whole-panel drag handler sees it. */
+.grip {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0.7;
+}
+
+.grip::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--dim2) 45%, var(--dim2) 58%, transparent 58%),
+    linear-gradient(135deg, transparent 70%, var(--dim2) 70%, var(--dim2) 83%, transparent 83%);
+}
